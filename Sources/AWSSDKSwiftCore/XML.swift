@@ -113,12 +113,19 @@ public class XMLNode : CustomStringConvertible, CustomDebugStringConvertible {
                 return XMLNode.xmlEncode(string: stringValue)
             }
             return ""
-        case .attribute, .namespace:
+        case .attribute:
             if let name = name {
                 return "\(name)=\"\(stringValue ?? "")\""
             } else {
                 return ""
             }
+        case .namespace:
+            var string = "xmlns"
+            if let name = name{
+                string += ":\(name)"
+            }
+            string += "=\"\(stringValue ?? "")\""
+            return string
         default:
             return ""
         }
