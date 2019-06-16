@@ -138,7 +138,7 @@ public final class HTTPClient {
 
         let response: EventLoopPromise<Response> = eventGroup.next().makePromise()
 
-        _ = NIOTSConnectionBootstrap(group: eventGroup as! NIOTSEventLoopGroup)
+        _ = NIOTSConnectionBootstrap(group: eventGroup)
             .connectTimeout(TimeAmount.seconds(5))
             .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
             .tlsOptions(NWProtocolTLS.Options())

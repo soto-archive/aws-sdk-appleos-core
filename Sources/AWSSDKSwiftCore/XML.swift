@@ -7,6 +7,7 @@
 //
 import Foundation
 
+#if os(iOS)
 /// base class for all types of XMLNode
 public class XMLNode : CustomStringConvertible, CustomDebugStringConvertible {
     
@@ -381,3 +382,4 @@ fileprivate class _XMLParserDelegate : NSObject, XMLParserDelegate {
     }
 }
 
+#endif // os(iOS)

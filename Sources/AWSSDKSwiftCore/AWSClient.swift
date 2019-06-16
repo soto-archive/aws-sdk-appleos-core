@@ -374,7 +374,7 @@ extension AWSClient {
                     guard let element = node.elements(forName: member.location?.name ?? member.label).first else { throw AWSClientError.missingParameter(message: "Payload is missing")}
                     // if shape has an xml namespace apply it to the element
                     if let xmlNamespace = Input._xmlNamespace {
-                        element.addNamespace(XMLNode.namespace(withName: "", stringValue: xmlNamespace) )
+                        element.addNamespace(XMLNode.namespace(withName: "", stringValue: xmlNamespace) as! XMLNode)
                     }
                     body = .xml(element)
                 default:
