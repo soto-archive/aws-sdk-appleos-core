@@ -6,18 +6,22 @@
 //
 //
 
-import CNIOBoringSSL
+import CommonCrypto
 
 func hmac(string: String, key: [UInt8]) -> [UInt8] {
-    var context = HMAC_CTX()
-    CNIOBoringSSL_HMAC_Init_ex(&context, key, key.count, CNIOBoringSSL_EVP_sha256(), nil)
+    var context = CCHmacContext()
+    CCHmacInit(&context, CCHmacAlgorithm(kCCHmacAlgSHA256), key, key.count)
+    //HMAC_Init(&context, key, key.count, SSL_EVP_sha256(), nil)
 
     let bytes = Array(string.utf8)
-    CNIOBoringSSL_HMAC_Update(&context, bytes, bytes.count)
-    var digest = [UInt8](repeating: 0, count: Int(EVP_MAX_MD_SIZE))
-    var length: UInt32 = 0
-    CNIOBoringSSL_HMAC_Final(&context, &digest, &length)
-    CNIOBoringSSL_HMAC_CTX_cleanup(&context)
+    CCHmacUpdate(&context, bytes, bytes.count)
+//    HMAC_Update(&context, bytes, bytes.count)
+    var digest = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+    //var length: UInt32 = 0
+    CCHmacFinal(&context, &digest)
+//    HMAC_Final(&context, &digest, &length)
 
-    return Array(digest[0..<Int(length)])
+//    HMAC_CTX_cleanup(&context)
+
+    return digest//Array(digest[0..<Int(length)])
 }

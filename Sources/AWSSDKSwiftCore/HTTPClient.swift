@@ -11,9 +11,10 @@
 
 import NIO
 import NIOHTTP1
-import NIOSSL
+import NIOTransportServices
 import NIOFoundationCompat
 import Foundation
+import Network
 
 public struct Request {
     var head: HTTPRequestHead
@@ -98,8 +99,8 @@ public final class HTTPClient {
     private let port: Int
     private let eventGroup: EventLoopGroup
 
-    public init(url: URL,
-                eventGroup: EventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)) throws {
+    public init(url: URL) throws {
+        
         guard let scheme = url.scheme else {
             throw HTTPClientError.malformedURL
         }
@@ -112,18 +113,26 @@ public final class HTTPClient {
         }
         self.hostname = hostname
         self.port = port
-        self.eventGroup = eventGroup
+        if #available (OSX 10.14, iOS 12.0, *) {
+            self.eventGroup = NIOTSEventLoopGroup()
+        } else {
+            self.eventGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+        }
     }
 
     public init(hostname: String,
-                port: Int,
-                eventGroup: EventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)) {
+                port: Int) {
         self.hostname = hostname
         self.port = port
-        self.eventGroup = eventGroup
+        if #available (OSX 10.14, iOS 12.0, *) {
+            self.eventGroup = NIOTSEventLoopGroup()
+        } else {
+            self.eventGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+        }
     }
 
     public func connect(_ request: Request) -> EventLoopFuture<Response> {
+        
         var head = request.head
         let body = request.body
 
@@ -135,41 +144,54 @@ public final class HTTPClient {
         // TODO implement Keep-alive
         head.headers.replaceOrAdd(name: "Connection", value: "Close")
 
-        var preHandlers = [ChannelHandler]()
-        if (port == 443) {
-            do {
-                let tlsConfiguration = TLSConfiguration.forClient()
-                let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
-                let tlsHandler = try NIOSSLClientHandler(context: sslContext, serverHostname: hostname)
-                preHandlers.append(tlsHandler)
-            } catch {
-                print("Unable to setup TLS: \(error)")
-            }
-        }
         let response: EventLoopPromise<Response> = eventGroup.next().makePromise()
 
-        _ = ClientBootstrap(group: eventGroup)
-            .connectTimeout(TimeAmount.seconds(5))
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
-            .channelInitializer { channel in
-                let accumulation = HTTPClientResponseHandler(promise: response)
-                let results = preHandlers.map { channel.pipeline.addHandler($0) }
-                return EventLoopFuture<Void>.andAllSucceed(results, on: channel.eventLoop).flatMap { _ in
-                    channel.pipeline.addHTTPClientHandlers().flatMap { _ in
+        if #available (OSX 10.14, iOS 12.0, *) {
+        //if #available(OSX 10.14, *) {
+            _ = NIOTSConnectionBootstrap(group: eventGroup as! NIOTSEventLoopGroup)
+                .connectTimeout(TimeAmount.seconds(5))
+                .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
+                .tlsOptions(NWProtocolTLS.Options())
+                .channelInitializer { channel in
+                    let accumulation = HTTPClientResponseHandler(promise: response)
+                    return channel.pipeline.addHTTPClientHandlers().flatMap {
                         channel.pipeline.addHandler(accumulation)
                     }
                 }
+                .connect(host: hostname, port: port)
+                .flatMap { channel -> EventLoopFuture<Void> in
+                    channel.write(NIOAny(HTTPClientRequestPart.head(head)), promise: nil)
+                    var buffer = ByteBufferAllocator().buffer(capacity: body.count)
+                    buffer.writeBytes(body)
+                    channel.write(NIOAny(HTTPClientRequestPart.body(.byteBuffer(buffer))), promise: nil)
+                    return channel.writeAndFlush(NIOAny(HTTPClientRequestPart.end(nil)))
+                }
+                .whenFailure { error in
+                    response.fail(error)
             }
-            .connect(host: hostname, port: port)
-            .flatMap { channel -> EventLoopFuture<Void> in
-                channel.write(NIOAny(HTTPClientRequestPart.head(head)), promise: nil)
-                var buffer = ByteBufferAllocator().buffer(capacity: body.count)
-                buffer.writeBytes(body)
-                channel.write(NIOAny(HTTPClientRequestPart.body(.byteBuffer(buffer))), promise: nil)
-                return channel.writeAndFlush(NIOAny(HTTPClientRequestPart.end(nil)))
+        } else {
+
+            _ = ClientBootstrap(group: eventGroup)
+                .connectTimeout(TimeAmount.seconds(5))
+                .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+                .channelInitializer { channel in
+                    let accumulation = HTTPClientResponseHandler(promise: response)
+                    //let results = preHandlers.map { channel.pipeline.addHandler($0) }
+                    return channel.pipeline.addHTTPClientHandlers().flatMap {
+                        channel.pipeline.addHandler(accumulation)
+                    }
+                }
+                .connect(host: hostname, port: port)
+                .flatMap { channel -> EventLoopFuture<Void> in
+                    channel.write(NIOAny(HTTPClientRequestPart.head(head)), promise: nil)
+                    var buffer = ByteBufferAllocator().buffer(capacity: body.count)
+                    buffer.writeBytes(body)
+                    channel.write(NIOAny(HTTPClientRequestPart.body(.byteBuffer(buffer))), promise: nil)
+                    return channel.writeAndFlush(NIOAny(HTTPClientRequestPart.end(nil)))
+                }
+                .whenFailure { error in
+                    response.fail(error)
             }
-            .whenFailure { error in
-                response.fail(error)
         }
         return response.futureResult
     }
