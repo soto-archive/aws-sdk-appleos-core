@@ -94,10 +94,32 @@ public class XMLNode {
         return children?.compactMap { $0.kind == kind ? $0 : nil }
     }
     
+    private static let xmlEncodedCharacters : [String.Element: String] = [
+        "\"": "&quot;",
+        "&": "&amp;",
+        "'": "&apos;",
+        "<": "&lt;",
+        ">": "&gt;",
+    ]
+    private static func xmlEncode(string: String) -> String {
+        var newString = ""
+        for c in string {
+            if let replacement = XMLNode.xmlEncodedCharacters[c] {
+                newString.append(contentsOf:replacement)
+            } else {
+                newString.append(c)
+            }
+        }
+        return newString
+    }
+    
     public var xmlString : String {
         switch kind {
         case .text:
-            return stringValue ?? ""
+            if let stringValue = stringValue {
+                return XMLNode.xmlEncode(string: stringValue)
+            }
+            return ""
         case .attribute, .namespace:
             if let name = name {
                 return "\(name)='\(stringValue ?? "")"
@@ -232,10 +254,12 @@ public class XMLElement : XMLNode {
         string += children(of:.namespace)?.map({" "+$0.xmlString}).joined(separator:"") ?? ""
         string += children(of:.attribute)?.map({" "+$0.xmlString}).joined(separator:"") ?? ""
         string += ">"
+        for node in children(of:.text) ?? [] {
+            string += node.xmlString
+        }
         for node in children(of:.element) ?? [] {
             string += node.xmlString
         }
-        string += stringValue ?? ""
         string += "</\(name!)>"
         return string
     }

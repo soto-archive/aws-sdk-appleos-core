@@ -134,7 +134,7 @@ class SerializersTests: XCTestCase {
             let a : Int
             let b : String
         }
-        let xml = "<Test><a>5</a><b>Hello</b></Test>"
+        let xml = "<Test><a>5</a><b>Hello&lt;</b></Test>"
         testDecodeEncode(type: Test.self, xml: xml)
     }
     
