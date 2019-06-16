@@ -97,7 +97,7 @@ private class HTTPClientResponseHandler: ChannelInboundHandler {
 public final class HTTPClient {
     private let hostname: String
     private let port: Int
-    private let eventGroup: EventLoopGroup
+    private let eventGroup: NIOTSEventLoopGroup
 
     public init(url: URL) throws {
         
@@ -113,22 +113,14 @@ public final class HTTPClient {
         }
         self.hostname = hostname
         self.port = port
-        if #available (OSX 10.14, iOS 12.0, *) {
-            self.eventGroup = NIOTSEventLoopGroup()
-        } else {
-            self.eventGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
-        }
+        self.eventGroup = NIOTSEventLoopGroup()
     }
 
     public init(hostname: String,
                 port: Int) {
         self.hostname = hostname
         self.port = port
-        if #available (OSX 10.14, iOS 12.0, *) {
-            self.eventGroup = NIOTSEventLoopGroup()
-        } else {
-            self.eventGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
-        }
+        self.eventGroup = NIOTSEventLoopGroup()
     }
 
     public func connect(_ request: Request) -> EventLoopFuture<Response> {
@@ -146,52 +138,26 @@ public final class HTTPClient {
 
         let response: EventLoopPromise<Response> = eventGroup.next().makePromise()
 
-        if #available (OSX 10.14, iOS 12.0, *) {
-        //if #available(OSX 10.14, *) {
-            _ = NIOTSConnectionBootstrap(group: eventGroup as! NIOTSEventLoopGroup)
-                .connectTimeout(TimeAmount.seconds(5))
-                .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
-                .tlsOptions(NWProtocolTLS.Options())
-                .channelInitializer { channel in
-                    let accumulation = HTTPClientResponseHandler(promise: response)
-                    return channel.pipeline.addHTTPClientHandlers().flatMap {
-                        channel.pipeline.addHandler(accumulation)
-                    }
+        _ = NIOTSConnectionBootstrap(group: eventGroup as! NIOTSEventLoopGroup)
+            .connectTimeout(TimeAmount.seconds(5))
+            .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
+            .tlsOptions(NWProtocolTLS.Options())
+            .channelInitializer { channel in
+                let accumulation = HTTPClientResponseHandler(promise: response)
+                return channel.pipeline.addHTTPClientHandlers().flatMap {
+                    channel.pipeline.addHandler(accumulation)
                 }
-                .connect(host: hostname, port: port)
-                .flatMap { channel -> EventLoopFuture<Void> in
-                    channel.write(NIOAny(HTTPClientRequestPart.head(head)), promise: nil)
-                    var buffer = ByteBufferAllocator().buffer(capacity: body.count)
-                    buffer.writeBytes(body)
-                    channel.write(NIOAny(HTTPClientRequestPart.body(.byteBuffer(buffer))), promise: nil)
-                    return channel.writeAndFlush(NIOAny(HTTPClientRequestPart.end(nil)))
-                }
-                .whenFailure { error in
-                    response.fail(error)
             }
-        } else {
-
-            _ = ClientBootstrap(group: eventGroup)
-                .connectTimeout(TimeAmount.seconds(5))
-                .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
-                .channelInitializer { channel in
-                    let accumulation = HTTPClientResponseHandler(promise: response)
-                    //let results = preHandlers.map { channel.pipeline.addHandler($0) }
-                    return channel.pipeline.addHTTPClientHandlers().flatMap {
-                        channel.pipeline.addHandler(accumulation)
-                    }
-                }
-                .connect(host: hostname, port: port)
-                .flatMap { channel -> EventLoopFuture<Void> in
-                    channel.write(NIOAny(HTTPClientRequestPart.head(head)), promise: nil)
-                    var buffer = ByteBufferAllocator().buffer(capacity: body.count)
-                    buffer.writeBytes(body)
-                    channel.write(NIOAny(HTTPClientRequestPart.body(.byteBuffer(buffer))), promise: nil)
-                    return channel.writeAndFlush(NIOAny(HTTPClientRequestPart.end(nil)))
-                }
-                .whenFailure { error in
-                    response.fail(error)
+            .connect(host: hostname, port: port)
+            .flatMap { channel -> EventLoopFuture<Void> in
+                channel.write(NIOAny(HTTPClientRequestPart.head(head)), promise: nil)
+                var buffer = ByteBufferAllocator().buffer(capacity: body.count)
+                buffer.writeBytes(body)
+                channel.write(NIOAny(HTTPClientRequestPart.body(.byteBuffer(buffer))), promise: nil)
+                return channel.writeAndFlush(NIOAny(HTTPClientRequestPart.end(nil)))
             }
+            .whenFailure { error in
+                response.fail(error)
         }
         return response.futureResult
     }
