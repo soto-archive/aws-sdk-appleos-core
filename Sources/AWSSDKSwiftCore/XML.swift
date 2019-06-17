@@ -7,7 +7,7 @@
 //
 import Foundation
 
-#if os(iOS)
+#if os(iOS) || os(tvOS)
 /// base class for all types of XMLNode
 public class XMLNode : CustomStringConvertible, CustomDebugStringConvertible {
     
@@ -28,7 +28,13 @@ public class XMLNode : CustomStringConvertible, CustomDebugStringConvertible {
     public fileprivate(set) var children : [XMLNode]?
     public weak var parent : XMLNode?
     
-    public init(_ kind: Kind, name: String? = nil, stringValue: String? = nil) {
+    init(kind: Kind) {
+        self.kind = kind
+        self.children = nil
+        self.parent = nil
+    }
+    
+    fileprivate init(_ kind: Kind, name: String? = nil, stringValue: String? = nil) {
         self.kind = kind
         self.name = name
         self.stringValue = stringValue
@@ -42,27 +48,27 @@ public class XMLNode : CustomStringConvertible, CustomDebugStringConvertible {
     }
     
     /// create XML element node
-    public static func element(withName: String, stringValue: String? = nil) -> XMLNode {
+    public static func element(withName: String, stringValue: String? = nil) -> Any {
         return XMLElement(name: withName, stringValue: stringValue)
     }
     
     /// create raw text node
-    public static func text(stringValue: String) -> XMLNode {
+    public static func text(stringValue: String) -> Any {
         return XMLNode(.text, stringValue: stringValue)
     }
     
     /// create XML attribute node
-    public static func attribute(withName: String, stringValue: String) -> XMLNode {
+    public static func attribute(withName: String, stringValue: String) -> Any {
         return XMLNode(.attribute, name: withName, stringValue: stringValue)
     }
     
     /// create XML namespace node
-    public static func namespace(withName: String, stringValue: String) -> XMLNode {
+    public static func namespace(withName: String, stringValue: String) -> Any {
         return XMLNode(.namespace, name: withName, stringValue: stringValue)
     }
     
     /// create XML comment node
-    public static func comment(stringValue: String) -> XMLNode {
+    public static func comment(stringValue: String) -> Any {
         return XMLNode(.comment, stringValue: stringValue)
     }
     
@@ -240,7 +246,7 @@ public class XMLElement : XMLNode {
         set(value) {
             children?.removeAll {$0.kind == .text}
             if let value = value {
-                addChild(XMLNode.text(stringValue: value))
+                addChild(XMLNode(.text, stringValue: value))
             }
         }
     }
@@ -357,7 +363,7 @@ fileprivate class _XMLParserDelegate : NSObject, XMLParserDelegate {
     func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String : String] = [:]) {
         let element = XMLElement(name: elementName)
         for attribute in attributeDict {
-            element.addAttribute(XMLNode.attribute(withName: attribute.key, stringValue: attribute.value))
+            element.addAttribute(XMLNode(.attribute, name: attribute.key, stringValue: attribute.value))
         }
         if rootElement ==  nil {
             rootElement = element
