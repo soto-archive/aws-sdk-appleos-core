@@ -110,7 +110,7 @@ extension AWSClient {
         let client = createHTTPClient(for: nioRequest)
         let futureResponse = client.connect(nioRequest)
 
-        futureResponse.whenComplete {
+        futureResponse.whenComplete { _ in
             client.close { error in
                 if let error = error {
                     print("Error closing connection: \(error)")
@@ -136,7 +136,7 @@ extension AWSClient {
 extension AWSClient {
     public func send<Input: AWSShape>(operation operationName: String, path: String, httpMethod: String, input: Input) throws -> Future<Void> {
 
-        return signer.manageCredential().thenThrowing { _ in
+        return signer.manageCredential().flatMapThrowing { _ in
                 let awsRequest = try self.createAWSRequest(
                     operation: operationName,
                     path: path,
@@ -144,41 +144,41 @@ extension AWSClient {
                     input: input
                 )
                 return try self.createNioRequest(awsRequest)
-            }.then { nioRequest in
+            }.flatMap { nioRequest in
                 return self.invoke(nioRequest)
-            }.thenThrowing { response in
+            }.flatMapThrowing { response in
                 return try self.validateCode(response: response)
             }
     }
 
     public func send(operation operationName: String, path: String, httpMethod: String) throws -> Future<Void> {
 
-        return signer.manageCredential().thenThrowing { _ in
+        return signer.manageCredential().flatMapThrowing { _ in
                 let awsRequest = try self.createAWSRequest(
                     operation: operationName,
                     path: path,
                     httpMethod: httpMethod
                 )
                 return try self.createNioRequest(awsRequest)
-            }.then { nioRequest in
+            }.flatMap { nioRequest in
                 return self.invoke(nioRequest)
-            }.thenThrowing { response in
+            }.flatMapThrowing { response in
                 return try self.validateCode(response: response)
             }
     }
 
     public func send<Output: AWSShape>(operation operationName: String, path: String, httpMethod: String) throws -> Future<Output> {
 
-        return signer.manageCredential().thenThrowing { _ in
+        return signer.manageCredential().flatMapThrowing { _ in
                 let awsRequest = try self.createAWSRequest(
                     operation: operationName,
                     path: path,
                     httpMethod: httpMethod
                 )
                 return try self.createNioRequest(awsRequest)
-            }.then { nioRequest in
+            }.flatMap { nioRequest in
                 return self.invoke(nioRequest)
-            }.thenThrowing { response in
+            }.flatMapThrowing { response in
                 return try self.validate(operation: operationName, response: response)
             }
     }
@@ -186,7 +186,7 @@ extension AWSClient {
     public func send<Output: AWSShape, Input: AWSShape>(operation operationName: String, path: String, httpMethod: String, input: Input)
         throws -> Future<Output> {
 
-            return signer.manageCredential().thenThrowing { _ in
+            return signer.manageCredential().flatMapThrowing { _ in
                     let awsRequest = try self.createAWSRequest(
                         operation: operationName,
                         path: path,
@@ -194,9 +194,9 @@ extension AWSClient {
                         input: input
                     )
                     return try self.createNioRequest(awsRequest)
-                }.then { nioRequest in
+                }.flatMap { nioRequest in
                     return self.invoke(nioRequest)
-                }.thenThrowing { response in
+                }.flatMapThrowing { response in
                     return try self.validate(operation: operationName, response: response)
                 }
     }
@@ -525,7 +525,7 @@ extension AWSClient {
 
         for (key, value) in response.head.headers {
             let headerParams = Output.headerParams
-            if let index = headerParams.index(where: { $0.key.lowercased() == key.description.lowercased() }) {
+            if let index = headerParams.firstIndex(where: { $0.key.lowercased() == key.description.lowercased() }) {
                 if let number = Double(value) {
                     outputDict[headerParams[index].key] = number.truncatingRemainder(dividingBy: 1) == 0 ? Int(number) : number
                 } else if let boolean = Bool(value) {
@@ -600,7 +600,7 @@ extension AWSClient {
                                     // this is a hack to wait...
                                     ///
                                     while dict[name] == nil {
-                                        _ = invoke(nioRequest).thenThrowing{ res in
+                                        _ = invoke(nioRequest).flatMapThrowing{ res in
                                             let representaion = try Representation().from(json: res.body)
                                             dict[name] = representaion.properties
                                         }
@@ -646,12 +646,7 @@ extension AWSClient {
     }
 
     private func createError(for response: Response, withComputedBody body: Body, withRawData data: Data) -> Error {
-        let bodyDict: [String: Any]
-        if let dict = try? body.asDictionary() {
-            bodyDict = dict ?? [:]
-        } else {
-            bodyDict = [:]
-        }
+        let bodyDict: [String: Any] = (try? body.asDictionary()) ?? [:]
 
         var code: String?
         var message: String?

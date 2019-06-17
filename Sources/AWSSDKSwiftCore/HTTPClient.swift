@@ -11,9 +11,10 @@
 
 import NIO
 import NIOHTTP1
-import NIOOpenSSL
+import NIOTransportServices
 import NIOFoundationCompat
 import Foundation
+import Network
 
 public struct Request {
     var head: HTTPRequestHead
@@ -52,21 +53,21 @@ private class HTTPClientResponseHandler: ChannelInboundHandler {
         self.promise = promise
     }
 
-    func errorCaught(ctx: ChannelHandlerContext, error: Error) {
-        promise.fail(error: HTTPClientError.error(error))
-        ctx.fireErrorCaught(error)
+    func errorCaught(context: ChannelHandlerContext, error: Error) {
+        promise.fail(HTTPClientError.error(error))
+        context.fireErrorCaught(error)
     }
 
-    public func channelRead(ctx: ChannelHandlerContext, data: NIOAny) {
+    public func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         switch unwrapInboundIn(data) {
         case .head(let head):
             switch state {
             case .ready: state = .parsingBody(head, nil)
-            case .parsingBody: promise.fail(error: HTTPClientError.malformedHead)
+            case .parsingBody: promise.fail(HTTPClientError.malformedHead)
             }
         case .body(var body):
             switch state {
-            case .ready: promise.fail(error: HTTPClientError.malformedBody)
+            case .ready: promise.fail(HTTPClientError.malformedBody)
             case .parsingBody(let head, let existingData):
                 let data: Data
                 if var existing = existingData {
@@ -80,13 +81,13 @@ private class HTTPClientResponseHandler: ChannelInboundHandler {
         case .end(let tailHeaders):
             assert(tailHeaders == nil, "Unexpected tail headers")
             switch state {
-            case .ready: promise.fail(error: HTTPClientError.malformedHead)
+            case .ready: promise.fail(HTTPClientError.malformedHead)
             case .parsingBody(let head, let data):
                 let res = Response(head: head, body: data ?? Data())
-                if ctx.channel.isActive {
-                    ctx.fireChannelRead(wrapOutboundOut(res))
+                if context.channel.isActive {
+                    context.fireChannelRead(wrapOutboundOut(res))
                 }
-                promise.succeed(result: res)
+                promise.succeed(res)
                 state = .ready
             }
         }
@@ -96,10 +97,10 @@ private class HTTPClientResponseHandler: ChannelInboundHandler {
 public final class HTTPClient {
     private let hostname: String
     private let port: Int
-    private let eventGroup: EventLoopGroup
+    private let eventGroup: NIOTSEventLoopGroup
 
-    public init(url: URL,
-                eventGroup: EventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)) throws {
+    public init(url: URL) throws {
+        
         guard let scheme = url.scheme else {
             throw HTTPClientError.malformedURL
         }
@@ -112,18 +113,18 @@ public final class HTTPClient {
         }
         self.hostname = hostname
         self.port = port
-        self.eventGroup = eventGroup
+        self.eventGroup = NIOTSEventLoopGroup()
     }
 
     public init(hostname: String,
-                port: Int,
-                eventGroup: EventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)) {
+                port: Int) {
         self.hostname = hostname
         self.port = port
-        self.eventGroup = eventGroup
+        self.eventGroup = NIOTSEventLoopGroup()
     }
 
     public func connect(_ request: Request) -> EventLoopFuture<Response> {
+        
         var head = request.head
         let body = request.body
 
@@ -135,41 +136,28 @@ public final class HTTPClient {
         // TODO implement Keep-alive
         head.headers.replaceOrAdd(name: "Connection", value: "Close")
 
-        var preHandlers = [ChannelHandler]()
-        if (port == 443) {
-            do {
-                let tlsConfiguration = TLSConfiguration.forClient()
-                let sslContext = try SSLContext(configuration: tlsConfiguration)
-                let tlsHandler = try OpenSSLClientHandler(context: sslContext, serverHostname: hostname)
-                preHandlers.append(tlsHandler)
-            } catch {
-                print("Unable to setup TLS: \(error)")
-            }
-        }
-        let response: EventLoopPromise<Response> = eventGroup.next().newPromise()
+        let response: EventLoopPromise<Response> = eventGroup.next().makePromise()
 
-        _ = ClientBootstrap(group: eventGroup)
+        _ = NIOTSConnectionBootstrap(group: eventGroup)
             .connectTimeout(TimeAmount.seconds(5))
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+            .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
+            .tlsOptions(NWProtocolTLS.Options())
             .channelInitializer { channel in
                 let accumulation = HTTPClientResponseHandler(promise: response)
-                let results = preHandlers.map { channel.pipeline.add(handler: $0) }
-                return EventLoopFuture<Void>.andAll(results, eventLoop: channel.eventLoop).then {
-                    channel.pipeline.addHTTPClientHandlers().then {
-                        channel.pipeline.add(handler: accumulation)
-                    }
+                return channel.pipeline.addHTTPClientHandlers().flatMap {
+                    channel.pipeline.addHandler(accumulation)
                 }
             }
             .connect(host: hostname, port: port)
-            .then { channel -> EventLoopFuture<Void> in
+            .flatMap { channel -> EventLoopFuture<Void> in
                 channel.write(NIOAny(HTTPClientRequestPart.head(head)), promise: nil)
                 var buffer = ByteBufferAllocator().buffer(capacity: body.count)
-                buffer.write(bytes: body)
+                buffer.writeBytes(body)
                 channel.write(NIOAny(HTTPClientRequestPart.body(.byteBuffer(buffer))), promise: nil)
                 return channel.writeAndFlush(NIOAny(HTTPClientRequestPart.end(nil)))
             }
             .whenFailure { error in
-                response.fail(error: error)
+                response.fail(error)
         }
         return response.futureResult
     }
