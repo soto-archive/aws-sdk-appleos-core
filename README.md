@@ -2,7 +2,7 @@
 
 <div>
     <a href="https://swift.org">
-        <img src="http://img.shields.io/badge/swift-4.2-brightgreen.svg" alt="Swift 4.2" />
+        <img src="http://img.shields.io/badge/swift-5.0-brightgreen.svg" alt="Swift 5.0" />
     </a>
     <a href="https://travis-ci.org/swift-aws/aws-sdk-appleos-core">
         <img src="https://travis-ci.org/swift-aws/aws-sdk-appleos-core.svg?branch=master" alt="Travis Build" />
