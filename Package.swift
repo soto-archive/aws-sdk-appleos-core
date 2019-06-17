@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "AWSSDKSwiftCore",
-    platforms: [ .iOS("12.2"), .macOS(.v10_14) ],
+    platforms: [ .iOS("12.2"), .macOS(.v10_14), .tvOS("12.2") ],
     products: [
         .library(name: "AWSSDKSwiftCore", targets: ["AWSSDKSwiftCore"])
     ],
