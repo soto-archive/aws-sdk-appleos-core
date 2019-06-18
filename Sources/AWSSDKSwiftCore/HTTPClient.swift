@@ -11,9 +11,10 @@
 
 import NIO
 import NIOHTTP1
-import NIOSSL
+import NIOTransportServices
 import NIOFoundationCompat
 import Foundation
+import Network
 
 public struct Request {
     var head: HTTPRequestHead
@@ -96,10 +97,11 @@ private class HTTPClientResponseHandler: ChannelInboundHandler {
 public final class HTTPClient {
     private let hostname: String
     private let port: Int
-    private let eventGroup: EventLoopGroup
+    private let eventGroup: NIOTSEventLoopGroup
 
     public init(url: URL,
-                eventGroup: EventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)) throws {
+                eventGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup()) throws {
+        
         guard let scheme = url.scheme else {
             throw HTTPClientError.malformedURL
         }
@@ -117,13 +119,14 @@ public final class HTTPClient {
 
     public init(hostname: String,
                 port: Int,
-                eventGroup: EventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)) {
+                eventGroup: NIOTSEventLoopGroup = NIOTSEventLoopGroup()) {
         self.hostname = hostname
         self.port = port
         self.eventGroup = eventGroup
     }
 
     public func connect(_ request: Request) -> EventLoopFuture<Response> {
+        
         var head = request.head
         let body = request.body
 
@@ -135,29 +138,16 @@ public final class HTTPClient {
         // TODO implement Keep-alive
         head.headers.replaceOrAdd(name: "Connection", value: "Close")
 
-        var preHandlers = [ChannelHandler]()
-        if (port == 443) {
-            do {
-                let tlsConfiguration = TLSConfiguration.forClient()
-                let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
-                let tlsHandler = try NIOSSLClientHandler(context: sslContext, serverHostname: hostname)
-                preHandlers.append(tlsHandler)
-            } catch {
-                print("Unable to setup TLS: \(error)")
-            }
-        }
         let response: EventLoopPromise<Response> = eventGroup.next().makePromise()
 
-        _ = ClientBootstrap(group: eventGroup)
+        _ = NIOTSConnectionBootstrap(group: eventGroup)
             .connectTimeout(TimeAmount.seconds(5))
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+            .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
+            .tlsOptions(NWProtocolTLS.Options())
             .channelInitializer { channel in
                 let accumulation = HTTPClientResponseHandler(promise: response)
-                let results = preHandlers.map { channel.pipeline.addHandler($0) }
-                return EventLoopFuture<Void>.andAllSucceed(results, on: channel.eventLoop).flatMap { _ in
-                    channel.pipeline.addHTTPClientHandlers().flatMap { _ in
-                        channel.pipeline.addHandler(accumulation)
-                    }
+                return channel.pipeline.addHTTPClientHandlers().flatMap {
+                    channel.pipeline.addHandler(accumulation)
                 }
             }
             .connect(host: hostname, port: port)
