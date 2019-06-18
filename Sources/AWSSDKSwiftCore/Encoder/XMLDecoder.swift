@@ -167,7 +167,7 @@ fileprivate class _XMLDecoder : Decoder {
                 }
                 expandedDictionary = true
             } else {
-                allKeys = element.children?.compactMap { (element: Foundation.XMLNode)->Key? in
+                allKeys = element.children?.compactMap { (element: XMLNode)->Key? in
                     if let name = element.name {
                         return Key(stringValue: name)
                     }
