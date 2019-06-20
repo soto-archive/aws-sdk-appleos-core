@@ -22,12 +22,15 @@ if [ "$remote_exists" = "false" ]; then
     git remote set-url --push upstream nopush
 fi
 
+echo "Get latest from github"
+git pull
+
 echo "Fetch from upstream"
 git fetch upstream
 
 echo "Update master"
 git checkout master
-git rebase upstream/appleos
+git merge upstream/appleos --allow-unrelated-histories
 
 swift test
 
