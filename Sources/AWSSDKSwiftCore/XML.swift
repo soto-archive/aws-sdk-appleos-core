@@ -10,7 +10,7 @@ import Foundation
 #if os(iOS) || os(tvOS)
 /// base class for all types of XMLNode
 public class XMLNode : CustomStringConvertible, CustomDebugStringConvertible {
-    
+
     /// XML node type
     public enum Kind {
         case document
@@ -20,20 +20,20 @@ public class XMLNode : CustomStringConvertible, CustomDebugStringConvertible {
         case namespace
         case comment
     }
-    
+
     /// defines the type of xml node
     public let kind : Kind
     public var name : String?
     public var stringValue : String?
     public fileprivate(set) var children : [XMLNode]?
     public weak var parent : XMLNode?
-    
+
     init(kind: Kind) {
         self.kind = kind
         self.children = nil
         self.parent = nil
     }
-    
+
     fileprivate init(_ kind: Kind, name: String? = nil, stringValue: String? = nil) {
         self.kind = kind
         self.name = name
@@ -46,37 +46,37 @@ public class XMLNode : CustomStringConvertible, CustomDebugStringConvertible {
     public static func document() -> XMLNode {
         return XMLDocument()
     }
-    
+
     /// create XML element node
     public static func element(withName: String, stringValue: String? = nil) -> Any {
         return XMLElement(name: withName, stringValue: stringValue)
     }
-    
+
     /// create raw text node
     public static func text(stringValue: String) -> Any {
         return XMLNode(.text, stringValue: stringValue)
     }
-    
+
     /// create XML attribute node
     public static func attribute(withName: String, stringValue: String) -> Any {
         return XMLNode(.attribute, name: withName, stringValue: stringValue)
     }
-    
+
     /// create XML namespace node
     public static func namespace(withName: String, stringValue: String) -> Any {
         return XMLNode(.namespace, name: withName, stringValue: stringValue)
     }
-    
+
     /// create XML comment node
     public static func comment(stringValue: String) -> Any {
         return XMLNode(.comment, stringValue: stringValue)
     }
-    
+
     /// return child node at index
     private func child(at index: Int) -> XMLNode? {
         return children?[index]
     }
-    
+
     /// return number of children
     public var childCount : Int { get {return children?.count ?? 0}}
 
@@ -85,12 +85,12 @@ public class XMLNode : CustomStringConvertible, CustomDebugStringConvertible {
         parent?.children?.removeAll(where: {$0 === self})
         parent = nil
     }
-    
+
     /// return children of a specific kind
     func children(of kind: Kind) -> [XMLNode]? {
         return children?.compactMap { $0.kind == kind ? $0 : nil }
     }
-    
+
     private static let xmlEncodedCharacters : [String.Element: String] = [
         "\"": "&quot;",
         "&": "&amp;",
@@ -110,7 +110,7 @@ public class XMLNode : CustomStringConvertible, CustomDebugStringConvertible {
         }
         return newString
     }
-    
+
     /// output formatted XML
     public var xmlString : String {
         switch kind {
@@ -136,7 +136,7 @@ public class XMLNode : CustomStringConvertible, CustomDebugStringConvertible {
             return ""
         }
     }
-    
+
     /// CustomStringConvertible protocol
     public var description: String {return xmlString}
     /// CustomDebugStringConvertible protocol
@@ -147,7 +147,7 @@ public class XMLNode : CustomStringConvertible, CustomDebugStringConvertible {
 public class XMLDocument : XMLNode {
     public var version : String?
     public var characterEncoding : String?
-    
+
     public init() {
         super.init(.document)
     }
@@ -156,7 +156,7 @@ public class XMLDocument : XMLNode {
         super.init(.document)
         setRootElement(rootElement)
     }
-    
+
     /// initialise with a block XML data
     public init(data: Data) throws {
         super.init(.document)
@@ -174,12 +174,12 @@ public class XMLDocument : XMLNode {
         }
         children = [rootElement]
     }
-    
+
     /// return the root element
     public func rootElement() -> XMLElement? {
         return children?.first {return ($0 as? XMLElement) != nil} as? XMLElement
     }
-    
+
     /// output formatted XML
     override public var xmlString: String {
         var string = "<?xml version=\"\(version ?? "1.0")\" encoding=\"\(characterEncoding ?? "UTF-8")\"?>"
@@ -200,7 +200,7 @@ public class XMLElement : XMLNode {
         super.init(.element, name: name)
         self.stringValue = stringValue
     }
-    
+
     /// initialise XMLElement from xml data
     public init(xmlData: Data) throws {
         super.init(.element)
@@ -219,13 +219,13 @@ public class XMLElement : XMLNode {
             throw XMLParsingError.emptyFile
         }
     }
-    
+
     /// initialise XMLElement from xml string
     convenience public init(xmlString: String) throws {
         let data = xmlString.data(using: .utf8)!
         try self.init(xmlData: data)
     }
-    
+
     /// return children XML elements
     public func elements(forName: String) -> [XMLElement] {
         return children?.compactMap {
@@ -240,7 +240,7 @@ public class XMLElement : XMLNode {
     public override var stringValue : String? {
         get {
             let textNodes = children(of:.text)
-            let text = textNodes?.reduce("", { return $0 + ($1.stringValue ?? "")})
+            let text = textNodes?.reduce("", { return $0 + ($1.stringValue ?? "")}) ?? ""
             return text
         }
         set(value) {
@@ -250,7 +250,7 @@ public class XMLElement : XMLNode {
             }
         }
     }
-    
+
     /// add a child node to the xml element
     public func addChild(_ node: XMLNode) {
         if children == nil {
@@ -260,13 +260,13 @@ public class XMLElement : XMLNode {
         }
         node.parent = self
     }
-    
+
     /// insert a child node at position in the list of children nodes
     public func insertChild(node: XMLNode, at index: Int) {
         children?.insert(node, at: index)
         node.parent = self
     }
-    
+
     /// set this elements children nodes
     public func setChildren(_ children: [XMLNode]?) {
         for child in self.children ?? [] {
@@ -277,7 +277,7 @@ public class XMLElement : XMLNode {
             child.parent = self
         }
     }
-    
+
     /// return attribute attached to element
     public func attribute(forName: String) -> XMLNode? {
         return children?.first {
@@ -287,7 +287,7 @@ public class XMLElement : XMLNode {
             return false
         }
     }
-    
+
     /// add an attribute to an element. If one with this name already exists it is replaced
     public func addAttribute(_ node : XMLNode) {
         if let name = node.name, let attributeNode = attribute(forName: name) {
@@ -305,7 +305,7 @@ public class XMLElement : XMLNode {
             return false
         }
     }
-    
+
     /// add a namespace to an element. If one with this name already exists it is replaced
     public func addNamespace(_ node : XMLNode) {
         if let name = node.name, let attributeNode = namespace(forName: name) {
@@ -349,17 +349,17 @@ extension XMLParsingError {
 
 /// parser delegate used in XML parsing
 fileprivate class _XMLParserDelegate : NSObject, XMLParserDelegate {
-    
+
     var rootElement : XMLElement?
     var currentElement : XMLElement?
     var error : Error?
-    
+
     override init() {
         self.currentElement = nil
         self.rootElement = nil
         super.init()
     }
-    
+
     func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String : String] = [:]) {
         let element = XMLElement(name: elementName)
         for attribute in attributeDict {
@@ -371,11 +371,11 @@ fileprivate class _XMLParserDelegate : NSObject, XMLParserDelegate {
         currentElement?.addChild(element)
         currentElement = element
     }
-    
+
     func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
         currentElement = currentElement?.parent as? XMLElement
     }
-    
+
     func parser(_ parser: XMLParser, foundCharacters: String) {
         if currentElement != nil {
             if currentElement!.stringValue == nil {
@@ -385,11 +385,11 @@ fileprivate class _XMLParserDelegate : NSObject, XMLParserDelegate {
             }
         }
     }
-    
+
     func parser(_ parser: XMLParser, parseErrorOccurred parseError: Error) {
         error = parseError
     }
-    
+
     func parser(_ parser: XMLParser, validationErrorOccurred validationError: Error) {
         error = validationError
     }
