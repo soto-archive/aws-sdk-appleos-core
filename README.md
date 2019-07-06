@@ -11,7 +11,7 @@ This is the underlying driver for executing requests to AWS, but you should like
 
 ## Swift NIO
 
-This client utilizes [Swift NIO](https://github.com/apple/swift-nio#conceptual-overview) to power its interactions with AWS. It returns an [`EventLoopFuture`](https://apple.github.io/swift-nio/docs/current/NIO/Classes/EventLoopFuture.html) in order to allow non-blocking frameworks to use this code. This version of aws-swift-core uses the NIOTransportServices to provide network connectivity. Please see the Swift NIO documentation for more details, and please let us know via an Issue if you have questions!
+This client utilizes [Swift NIO](https://github.com/apple/swift-nio#conceptual-overview) to power its interactions with AWS. It returns an [`EventLoopFuture`](https://apple.github.io/swift-nio/docs/current/NIO/Classes/EventLoopFuture.html) in order to allow non-blocking frameworks to use this code. This version of aws-adk-swift-core uses the NIOTransportServices to provide network connectivity. The NIOTransportServices package is reliant on Network.framework. This means it can support all Apple platforms but is not available for Linux. Please see the Swift NIO documentation for more details, and please let us know via an Issue if you have questions!
 
 ## Including AWSSDKAppleOS in your project
 
