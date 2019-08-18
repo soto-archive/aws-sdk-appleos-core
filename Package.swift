@@ -17,7 +17,6 @@ let package = Package(
         .target(
             name: "AWSSDKSwiftCore",
             dependencies: [
-                "CAWSSDKOpenSSL",
                 "HypertextApplicationLanguage",
                 "NIO",
                 "NIOHTTP1",
