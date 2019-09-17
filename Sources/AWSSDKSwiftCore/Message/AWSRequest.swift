@@ -10,20 +10,6 @@ import Foundation
 import NIO
 import NIOHTTP1
 
-public protocol AWSServiceMiddleware {
-    func chain(request: AWSRequest) throws -> AWSRequest
-    func chain(responseBody: Body) throws -> Body
-}
-
-public extension AWSServiceMiddleware {
-    func chain(request: AWSRequest) throws -> AWSRequest {
-        return request
-    }
-    func chain(responseBody: Body) throws -> Body {
-        return responseBody
-    }
-}
-
 extension URL {
     public var hostWithPort: String? {
         guard var host = self.host else {
@@ -58,11 +44,11 @@ public struct AWSRequest {
     public let amzTarget: String?
     public let operation: String
     public let httpMethod: String
-    public var httpHeaders: [String: Any?] = [:]
+    public var httpHeaders: [String: Any] = [:]
     public var body: Body
     public let middlewares: [AWSServiceMiddleware]
 
-    public init(region: Region = .useast1, url: URL, serviceProtocol: ServiceProtocol, service: String, amzTarget: String? = nil, operation: String, httpMethod: String, httpHeaders: [String: Any?] = [:], body: Body = .empty, middlewares: [AWSServiceMiddleware] = []) {
+    public init(region: Region = .useast1, url: URL, serviceProtocol: ServiceProtocol, service: String, amzTarget: String? = nil, operation: String, httpMethod: String, httpHeaders: [String: Any] = [:], body: Body = .empty, middlewares: [AWSServiceMiddleware] = []) {
         self.region = region
         self.url = url
         self.serviceProtocol = serviceProtocol
@@ -87,7 +73,7 @@ public struct AWSRequest {
 
         var headers: [String:String] = [:]
         for (key, value) in awsRequest.httpHeaders {
-            guard let value = value else { continue }
+            //guard let value = value else { continue }
             headers[key] = "\(value)"
         }
 

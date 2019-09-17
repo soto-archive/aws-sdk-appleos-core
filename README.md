@@ -6,7 +6,7 @@
 
 A Core Framework for [AWSSDKAppleOS](https://github.com/swift-aws/aws-sdk-appleos)
 
-This is the underlying driver for executing requests to AWS, but you should likely use one of the libraries provided by the package above instead of this! The code for this is based on [AWSSDKSwiftCore](https://github.com/swift-aws/aws-sdk-swift-core). 
+This is the underlying driver for executing requests to AWS, but you should likely use one of the libraries provided by the package above instead of this! The code for this is based on [AWSSDKSwiftCore](https://github.com/swift-aws/aws-sdk-swift-core).
 
 
 ## Swift NIO
