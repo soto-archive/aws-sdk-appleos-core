@@ -1,4 +1,4 @@
-Now that AWSSDK Swift supports iOS and macOS as first class citizens, AWSSDK AppleOS has been deprecated. It will not receive any new updates. Please move to using AWSSDKSwift to keep up to date with changes.
+## Now that AWSSDK Swift supports iOS and macOS as first class citizens, AWSSDK AppleOS has been deprecated. It will not receive any new updates. Please move to using AWSSDKSwift to keep up to date with changes.
 
 # AWSSDK AppleOS Core
 
